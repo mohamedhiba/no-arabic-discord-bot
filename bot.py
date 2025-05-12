@@ -1,6 +1,7 @@
 import os
 import discord
 from discord.ext import commands
+from discord import app_commands
 from dotenv import load_dotenv
 import logging
 
@@ -21,7 +22,16 @@ intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
 
-bot = commands.Bot(command_prefix='!', intents=intents)
+class EnglishOnlyBot(commands.Bot):
+    def __init__(self):
+        super().__init__(command_prefix='!', intents=intents)
+        
+    async def setup_hook(self):
+        # Sync commands when bot starts
+        await self.tree.sync()
+        logger.info("Slash commands synced!")
+
+bot = EnglishOnlyBot()
 
 def contains_arabic(text):
     """Check if text contains Arabic characters."""
@@ -35,6 +45,32 @@ async def on_ready():
     logger.info(f'{bot.user} has connected to Discord!')
     logger.info(f'Monitoring channels: {ENGLISH_ONLY_CHANNEL_IDS}')
     logger.info(f'Arabic chat channel: {ARABIC_CHAT_CHANNEL_ID}')
+
+# Add a slash command
+@bot.tree.command(name="english-only", description="Get information about English-only channels")
+async def english_only(interaction: discord.Interaction):
+    """Slash command to get information about English-only channels"""
+    channels_info = "\n".join([f"<#{channel_id}>" for channel_id in ENGLISH_ONLY_CHANNEL_IDS])
+    arabic_channel = f"<#{ARABIC_CHAT_CHANNEL_ID}>"
+    
+    embed = discord.Embed(
+        title="English-Only Channels Information",
+        description="Here are the channels where English is enforced:",
+        color=discord.Color.blue()
+    )
+    embed.add_field(
+        name="English-Only Channels",
+        value=channels_info or "No channels configured",
+        inline=False
+    )
+    embed.add_field(
+        name="Arabic Chat Channel",
+        value=arabic_channel,
+        inline=False
+    )
+    embed.set_footer(text="Use /english-only to see this information again")
+    
+    await interaction.response.send_message(embed=embed, ephemeral=True)
 
 @bot.event
 async def on_message(message):
